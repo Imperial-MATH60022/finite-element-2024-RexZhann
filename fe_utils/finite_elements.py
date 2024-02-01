@@ -1,5 +1,8 @@
 import numpy as np
 from .reference_elements import ReferenceInterval, ReferenceTriangle
+
+
+
 np.seterr(invalid='ignore', divide='ignore')
 
 
@@ -16,8 +19,16 @@ def lagrange_points(cell, degree):
     <ex-lagrange-points>`.
 
     """
-
-    raise NotImplementedError
+    r = list(range(degree + 1))
+    r[1], r[-1] = r[-1], r[1]
+    if cell.dim == 1:
+        return np.array([[i / degree] for i in r])
+    elif cell.dim == 2:
+        vertices = [(0, 0), (degree, 0), (0, degree)]
+        remaining_points = [(i, j) for i in range(degree + 1) for j in range(degree + 1) if i + j <= degree and (i, j) not in vertices]
+        points = vertices + remaining_points
+        return np.array([[i / degree, j / degree] for i, j in points])
+        
 
 
 def vandermonde_matrix(cell, degree, points, grad=False):
@@ -34,8 +45,39 @@ def vandermonde_matrix(cell, degree, points, grad=False):
     The implementation of this function is left as an :ref:`exercise
     <ex-vandermonde>`.
     """
+    if cell.dim == 1:
+        points =[x[0] for x in points]
 
-    raise NotImplementedError
+    if cell.dim > 1:
+        if grad:
+            size = (degree + 1) ** (2 if cell.dim == 2 else 3)
+        else:
+            size = (degree + 1) ** (1 if cell.dim == 1 else 2)
+        
+        vandermonde = np.zeros((len(points), size))
+
+        for i, point in enumerate(points):
+            for j in range(degree + 1):
+                for k in range(degree + 1 - j):
+                    if cell.dim == 2:
+                        vandermonde[i, j * (degree + 1) + k] = point[0] ** j * point[1] ** k
+                        if grad:
+                            vandermonde[i, size // 2 + j * (degree + 1) + k] = j * point[0] ** (j - 1) * point[1] ** k
+                    
+    else:
+        if grad:
+            size = 2 * (degree + 1)
+            vandermonde = np.zeros((len(points), size))
+            for i, point in enumerate(points):
+                for j in range(degree + 1):
+                    vandermonde[i, j] = point ** j
+                    if j > 0:
+                        vandermonde[i, j + degree + 1] = j * point ** (j - 1)
+        else:
+            vandermonde = np.vander(points, N=degree + 1, increasing=True)
+        
+    
+    return vandermonde
 
 
 class FiniteElement(object):
