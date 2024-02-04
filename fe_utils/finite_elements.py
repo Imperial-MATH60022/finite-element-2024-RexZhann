@@ -28,7 +28,6 @@ def lagrange_points(cell, degree):
         remaining_points = [(i, j) for i in range(degree + 1) for j in range(degree + 1) if i + j <= degree and (i, j) not in vertices]
         points = vertices + remaining_points
         return np.array([[i / degree, j / degree] for i, j in points])
-        
 
 
 def vandermonde_matrix(cell, degree, points, grad=False):
@@ -45,39 +44,61 @@ def vandermonde_matrix(cell, degree, points, grad=False):
     The implementation of this function is left as an :ref:`exercise
     <ex-vandermonde>`.
     """
-    if cell.dim == 1:
-        points =[x[0] for x in points]
 
-    if cell.dim > 1:
-        if grad:
-            size = (degree + 1) ** (2 if cell.dim == 2 else 3)
-        else:
-            size = (degree + 1) ** (1 if cell.dim == 1 else 2)
-        
-        vandermonde = np.zeros((len(points), size))
+    if not grad:
 
-        for i, point in enumerate(points):
-            for j in range(degree + 1):
-                for k in range(degree + 1 - j):
-                    if cell.dim == 2:
-                        vandermonde[i, j * (degree + 1) + k] = point[0] ** j * point[1] ** k
-                        if grad:
-                            vandermonde[i, size // 2 + j * (degree + 1) + k] = j * point[0] ** (j - 1) * point[1] ** k
-                    
-    else:
-        if grad:
-            size = 2 * (degree + 1)
+        if cell.dim == 1:  # when dimension is 1
+
+            size = degree + 1
             vandermonde = np.zeros((len(points), size))
+            points = [x[0] for x in points]
             for i, point in enumerate(points):
-                for j in range(degree + 1):
+                vandermonde[i, 0] = np.array([0])
+                for j in range(0, degree + 1):
                     vandermonde[i, j] = point ** j
-                    if j > 0:
-                        vandermonde[i, j + degree + 1] = j * point ** (j - 1)
-        else:
-            vandermonde = np.vander(points, N=degree + 1, increasing=True)
-        
-    
-    return vandermonde
+                pass
+
+        if cell.dim == 2:
+            size = (degree + 2) * (degree + 1) // 2
+            vandermonde = np.zeros((len(points), size))
+
+            for i, point in enumerate(points):
+                count_deg, count_pos = 0, 0
+                for j in range(count_deg + 1):
+                    if cell.dim == 2 and count_pos < size:
+                        vandermonde[i, count_pos] = point[1] ** j * point[0] ** (count_deg - j)
+                    pass
+
+    else:  # cases where we take the gradient
+
+        # 1-dimensional case
+        if cell.dim == 1:
+            size = degree + 1
+            vandermonde = np.zeros((len(points), size, 1))  # build up the shape of the vandermonde matrix
+            for i, point in enumerate(points):
+                for i, point in enumerate(points):
+                    vandermonde[i, 0] = np.array([0])  # fill in the constant terms
+                    for j in range(1, degree + 1):
+                        vandermonde[i, j, 0] = np.array([(j * point ** (j-1))]) # fill in the rest
+                    pass
+                
+        # 2-dimensional case
+        if cell.dim == 2:
+            size = (degree + 2) * (degree + 1) // 2
+            vandermonde = np.zeros((len(points), size, 2))  # build up the shape of the vandermonde matrix
+            for i, point in enumerate(points):
+                count_deg = 0  # set up two pointers, one for the current column position, and the other for the current degree.
+                count_pos = 0
+                while count_deg <= degree:
+                    for j in range(count_deg + 1):
+                        if count_pos < size:
+                            vandermonde[i, count_pos, 1], vandermonde[i, count_pos, 0] = np.array([j * point[1] ** (j - 1) * point[0] ** (count_deg - j)]), np.array([(count_deg - j) * point[1] ** j * point[0] ** (count_deg - j - 1)])
+                            count_pos += 1
+                            if j == count_deg:
+                                count_deg += 1
+                        pass
+
+    return np.nan_to_num(vandermonde)
 
 
 class FiniteElement(object):
@@ -111,6 +132,8 @@ class FiniteElement(object):
         #: is the list of nodes associated with entity `(d, i)`.
         self.entity_nodes = entity_nodes
 
+        self.basis_coefs = np.linalg.inv(vandermonde_matrix(cell, degree, nodes))
+
         if entity_nodes:
             #: ``nodes_per_entity[d]`` is the number of entities
             #: associated with an entity of dimension d.
@@ -120,7 +143,6 @@ class FiniteElement(object):
         # Replace this exception with some code which sets
         # self.basis_coefs
         # to an array of polynomial coefficients defining the basis functions.
-        raise NotImplementedError
 
         #: The number of nodes in this element.
         self.node_count = nodes.shape[0]
@@ -146,7 +168,14 @@ class FiniteElement(object):
 
         """
 
-        raise NotImplementedError
+        vand = vandermonde_matrix(self.cell, self.degree, points, grad=grad)
+        if not grad:
+            result = vand @ self.basis_coefs
+
+        else:
+            result = np.einsum("ijk, jl -> ilk", vand, self.basis_coefs)
+
+        return result
 
     def interpolate(self, fn):
         """Interpolate fn onto this finite element by evaluating it
@@ -163,7 +192,7 @@ class FiniteElement(object):
 
         """
 
-        raise NotImplementedError
+        return fn(self.nodes)
 
     def __repr__(self):
         return "%s(%s, %s)" % (self.__class__.__name__,
@@ -184,8 +213,11 @@ class LagrangeElement(FiniteElement):
         The implementation of this class is left as an :ref:`exercise
         <ex-lagrange-element>`.
         """
+        nodes = lagrange_points(cell, degree)
 
-        raise NotImplementedError
+        self.entity_node = cell.topology
+
+        
         # Use lagrange_points to obtain the set of nodes.  Once you
         # have obtained nodes, the following line will call the
         # __init__ method on the FiniteElement class to set up the
