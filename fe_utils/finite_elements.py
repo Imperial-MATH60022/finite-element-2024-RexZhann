@@ -64,10 +64,15 @@ def vandermonde_matrix(cell, degree, points, grad=False):
 
             for i, point in enumerate(points):
                 count_deg, count_pos = 0, 0
-                for j in range(count_deg + 1):
-                    if cell.dim == 2 and count_pos < size:
-                        vandermonde[i, count_pos] = point[1] ** j * point[0] ** (count_deg - j)
-                    pass
+                while count_deg <= degree:
+                    for j in range(count_deg + 1):
+                        if count_pos < size:
+                            vandermonde[i, count_pos] = point[1] ** j * point[0] ** (count_deg - j)
+                            count_pos += 1
+                            if j == count_deg:
+                                count_deg += 1
+                        pass
+                    
 
     else:  # cases where we take the gradient
 
@@ -92,7 +97,7 @@ def vandermonde_matrix(cell, degree, points, grad=False):
                 while count_deg <= degree:
                     for j in range(count_deg + 1):
                         if count_pos < size:
-                            vandermonde[i, count_pos, 1], vandermonde[i, count_pos, 0] = np.array([j * point[1] ** (j - 1) * point[0] ** (count_deg - j)]), np.array([(count_deg - j) * point[1] ** j * point[0] ** (count_deg - j - 1)])
+                            vandermonde[i, count_pos, 1], vandermonde[i, count_pos, 0] = np.array([j * np.real(np.power(point[1], (j - 1), dtype=complex)) * point[0] ** (count_deg - j)]), np.array([(count_deg - j) * point[1] ** j * np.real(np.power(point[0], (count_deg - j - 1), dtype=complex))])
                             count_pos += 1
                             if j == count_deg:
                                 count_deg += 1
