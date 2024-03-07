@@ -2,11 +2,10 @@ import numpy as np
 from .reference_elements import ReferenceInterval, ReferenceTriangle
 
 
-
 np.seterr(invalid='ignore', divide='ignore')
 
 
-def lagrange_points(cell, degree):
+'''def lagrange_points(cell, degree):
     """Construct the locations of the equispaced Lagrange nodes on cell.
 
     :param cell: the :class:`~.reference_elements.ReferenceCell`
@@ -28,6 +27,140 @@ def lagrange_points(cell, degree):
         remaining_points = [(i, j) for i in range(degree + 1) for j in range(degree + 1) if i + j <= degree and (i, j) not in vertices]
         points = vertices + remaining_points
         return np.array([[i / degree, j / degree] for i, j in points])
+'''
+
+'''
+def lagrange_points(cell, degree, obtain_entity=False):
+    if cell.dim == 1:
+        # For a 1D interval, simply generate linearly spaced points between the vertices.
+        vertices = np.array(cell.vertices)
+        points = np.linspace(vertices[0, 0], vertices[1, 0], degree + 1)
+        entity_node = {}
+        if obtain_entity:
+            entity_node = {0: {}, 1: {}}
+            for idx, point in enumerate(points):
+                if idx == 0 or idx =
+            return points[:, np.newaxis],  # Ensure correct shape (N, 1) for 1D points
+        else:
+            return points[:, np.newaxis]
+
+
+    else:
+         # Total points are calculated by the formula (n+1)(n+2)/2
+        points = []
+        ind = 0
+        # Add vertex points
+        ver_ind = []
+        for vertex in cell.vertices:
+            points.append(vertex)
+            ver_ind.append(ind)
+            ind += 1
+
+        # Add edge points
+        edg_ind = []
+        edges = [(0, 1), (1, 2), (2, 0)]
+        for v0, v1 in edges:
+            edge_points = [(1 - i / degree) * cell.vertices[v0] + (i / degree)
+                           * cell.vertices[v1] for i in range(1, degree)]
+            points.extend(edge_points)
+            edg_ind.append(ind)
+            ind += 1
+
+        # Add interior points
+        int_ind = []
+        for i in range(1, degree):
+            for j in range(1, degree - i):
+                x = i / degree
+                y = j / degree
+                z = 1 - x - y
+                interior_point = x * cell.vertices[0] + y * cell.vertices[1] + z * cell.vertices[2]
+                points.append(interior_point)
+                int_ind.append(ind)
+                ind += 1
+
+        entity_node = {}
+        if obtain_entity:
+            entity_nodes = {0: {}, 1: {}, 2: {}}
+
+            # Vertex entities
+            for idx, vertex in enumerate(cell.vertices):
+                entity_nodes[0][idx] = [idx]
+
+            # Edge entities
+            for idx, edg_index in enumerate(edg_ind):
+                entity_node[1][idx] = edg_index
+
+            # Interior entity
+            for idx, int_index in enumerate(int_ind):
+                entity_node[2][idx] = int_index
+
+            return np.array(points), entity_node
+
+        else:
+            return np.array(points)
+        '''
+
+def lagrange_points(cell, degree, obtain_entity_points=False):
+    if cell.dim not in [1, 2]:
+        raise NotImplementedError("This function only supports 1D and 2D cells for now.")
+    
+    points = []  # Store the generated Lagrange points here
+    entity_node = {dim: {} for dim in range(cell.dim + 1)}  # Initialize the entity_node dictionary
+    
+    if cell.dim == 1:
+        # For a 1D interval, generate points linearly spaced between the vertices.
+        vertices = np.array(cell.vertices)
+        points = np.linspace(vertices[0, 0], vertices[1, 0], degree + 1)
+        points = points[:, np.newaxis]  # Ensure correct shape (N, 1) for 1D points
+        
+        if obtain_entity_points:
+            # 0D entities are the endpoints
+            entity_node[0] = {0: [0], 1: [degree]}
+            # 1D entity is the whole cell, excluding the endpoints
+            entity_node[1] = {0: list(range(1, degree))}
+
+    elif cell.dim == 2:
+        # Add vertex points for 2D cell (triangle)
+        for vertex in cell.vertices:
+            points.append(vertex)
+            
+        edges = [(0, 1), (1, 2), (2, 0)]
+        edge_points_indices = []
+        for idx, (v0, v1) in enumerate(edges):
+            edge_indices = [idx * (degree + 1)]  # Starting index for this edge's points
+            edge_points = [(1 - i / degree) * cell.vertices[v0] + (i / degree) * cell.vertices[v1] for i in range(1, degree)]
+            for point in edge_points:
+                points.append(point)
+                edge_indices.append(len(points) - 1)
+            edge_indices.append((idx + 1) % 3)  # Ending vertex of this edge
+            edge_points_indices.append(edge_indices)
+            if obtain_entity_points:
+                entity_node[1][idx] = edge_indices  # Store edge indices
+            
+        # Add interior points for 2D cell
+        interior_points_indices = []
+        for i in range(1, degree):
+            for j in range(1, degree - i):
+                x = i / degree
+                y = j / degree
+                z = 1 - x - y
+                interior_point = x * cell.vertices[0] + y * cell.vertices[1] + z * cell.vertices[2]
+                points.append(interior_point)
+                interior_points_indices.append(len(points) - 1)
+        if obtain_entity_points:
+            entity_node[2] = {0: interior_points_indices}  # Store interior indices
+        
+        if obtain_entity_points:
+            # Store vertices in the entity_node dictionary for 2D cell
+            for idx, vertex in enumerate(cell.vertices):
+                entity_node[0][idx] = [idx]
+                
+    points = np.array(points)
+    
+    if obtain_entity_points:
+        return points, entity_node
+    else:
+        return points
 
 
 def vandermonde_matrix(cell, degree, points, grad=False):
@@ -97,7 +230,9 @@ def vandermonde_matrix(cell, degree, points, grad=False):
                 while count_deg <= degree:
                     for j in range(count_deg + 1):
                         if count_pos < size:
-                            vandermonde[i, count_pos, 1], vandermonde[i, count_pos, 0] = np.array([j * np.real(np.power(point[1], (j - 1), dtype=complex)) * point[0] ** (count_deg - j)]), np.array([(count_deg - j) * point[1] ** j * np.real(np.power(point[0], (count_deg - j - 1), dtype=complex))])
+                            vandermonde[i, count_pos, 1], vandermonde[i, count_pos, 0] = np.array([j * np.real(np.power(point[1], (j - 1), dtype=complex)) * 
+                                                                                                   point[0] ** (count_deg - j)]), np.array([(count_deg - j) * 
+                                                                                                   point[1] ** j * np.real(np.power(point[0], (count_deg - j - 1), dtype=complex))])
                             count_pos += 1
                             if j == count_deg:
                                 count_deg += 1
@@ -135,7 +270,6 @@ class FiniteElement(object):
         self.nodes = nodes
         #: A dictionary of dictionaries such that ``entity_nodes[d][i]``
         #: is the list of nodes associated with entity `(d, i)`.
-        self.entity_nodes = entity_nodes
 
         self.basis_coefs = np.linalg.inv(vandermonde_matrix(cell, degree, nodes))
 
@@ -197,7 +331,7 @@ class FiniteElement(object):
 
         """
 
-        return fn(self.nodes)
+        return [fn(node) for node in self.nodes]
 
     def __repr__(self):
         return "%s(%s, %s)" % (self.__class__.__name__,
@@ -218,9 +352,9 @@ class LagrangeElement(FiniteElement):
         The implementation of this class is left as an :ref:`exercise
         <ex-lagrange-element>`.
         """
-        nodes = lagrange_points(cell, degree)
+        nodes, self.entity_nodes = lagrange_points(cell, degree, obtain_entity_points=True)
 
-        self.entity_node = cell.topology
+        
 
         
         # Use lagrange_points to obtain the set of nodes.  Once you
