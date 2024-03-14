@@ -8,33 +8,46 @@ from matplotlib.tri import Triangulation
 class FunctionSpace(object):
 
     def __init__(self, mesh, element):
-        """A finite element space.
-
-        :param mesh: The :class:`~.mesh.Mesh` on which this space is built.
-        :param element: The :class:`~.finite_elements.FiniteElement` of this
-            space.
-
-        Most of the implementation of this class is left as an :ref:`exercise
-        <ex-function-space>`.
-        """
-
-        #: The :class:`~.mesh.Mesh` on which this space is built.
         self.mesh = mesh
-        #: The :class:`~.finite_elements.FiniteElement` of this space.
         self.element = element
+        cell = element.cell
+        self.nodes_per_entity = np.array([len(self.element.entity_nodes.get(d, [0])[0]) for d in range(self.mesh.dim+1)])
 
-        raise NotImplementedError
+        # Calculate the total number of nodes in the function space
+        self.node_count = sum(self.nodes_per_entity * np.array([mesh.entity_counts[d] for d in range(mesh.dim + 1)]))
 
-        # Implement global numbering in order to produce the global
-        # cell node list for this space.
-        #: The global cell node list. This is a two-dimensional array in
-        #: which each row lists the global nodes incident to the corresponding
-        #: cell. The implementation of this member is left as an
-        #: :ref:`exercise <ex-function-space>`
-        self.cell_nodes = None
+        self.cell_nodes = np.zeros((len(mesh.cell_vertices), element.node_count), dtype=int)
 
-        #: The total number of nodes in the function space.
-        self.node_count = np.dot(element.nodes_per_entity, mesh.entity_counts)
+        # Populate the global cell-node list
+        for c, cell in enumerate(mesh.cell_vertices):
+            indices = []
+            for delta in range(mesh.dim + 1):  # Loop over entity dimensions
+                entity_count = mesh.entity_counts[delta]
+                for epsilon in range(len(element.entity_nodes[delta])):  # Loop over entities of dimension delta
+
+                    if delta < mesh.dim:
+                        print(f'mesh : {mesh.adjacency(mesh.dim, delta)}')
+                        print(f'c : {c}')
+                        print(f'ep : {epsilon}')
+                        i = mesh.adjacency(mesh.dim, delta)[c, epsilon]
+                    else:
+                        i = c
+
+                    G = self.global_node_number(delta, i, mesh, element)
+                    N_delta = self.nodes_per_entity[delta]
+
+                    for offset in range(N_delta):
+                        indices.append(G + offset)
+            
+            print(f'cell_nodes : {self.cell_nodes}')
+            print(f'indices : {indices}')
+            self.cell_nodes[c] = indices
+
+    def global_node_number(self, delta, i, mesh, element):
+        """Calculate the first global node number for entity (delta, i)."""
+        G = sum(mesh.entity_counts[dim] * self.nodes_per_entity[dim] for dim in range(delta))
+        G += i * self.nodes_per_entity[delta]
+        return G
 
     def __repr__(self):
         return "%s(%s, %s)" % (self.__class__.__name__,
