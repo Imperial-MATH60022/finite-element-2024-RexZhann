@@ -16,7 +16,71 @@ def assemble(fs, f):
     the function space in which to solve and the right hand side
     function."""
 
-    raise NotImplementedError
+    # Create an appropriate (complete) quadrature rule.
+    Q = gauss_quadrature(fs.element.cell, fs.element.degree + 1)
+    points = Q.points
+    Q_weights_diag = np.diag(Q.weights)
+    # Tabulate the basis functions and their gradients at the quadrature points.
+    phi = fs.element.tabulate(points)
+    print(phi.shape)
+
+    grad_phi = fs.element.tabulate(points, grad=True)
+
+    grad_phi_trans = grad_phi.transpose((0, 2, 1))
+    # Create the left hand side matrix and right hand side vector.
+    # This creates a sparse matrix because creating a dense one may
+    # well run your machine out of memory!
+    A = sp.lil_matrix((fs.node_count, fs.node_count))
+    l = np.zeros(fs.node_count)
+
+
+    
+    # Now loop over all the cells and assemble A and l
+    for c in range(len(fs.mesh.cell_vertices)):
+
+        #Obtain the basic information we need for the assembling
+        nodes = fs.cell_nodes[c, :]
+
+        J = fs.mesh.jacobian(c)
+        
+        detJ = np.absolute(np.linalg.det(J))
+
+        J_inv_trans = np.linalg.inv(J).T
+
+        # Now consider A
+
+        
+
+        # Here E * detJ is the term that fits in (6.81), and we 
+        #will assemble E by computing C and D terms
+        C = np.matmul(J_inv_trans, grad_phi_trans)
+
+        D = np.tensordot(Q.weights, np.matmul(C.transpose((0, 2, 1)), C), axes=([0],[0]))
+
+        
+
+        result = D * detJ
+
+        A[np.ix_(nodes, nodes)] += result
+
+        f_values = np.dot(phi, f.values[nodes]) 
+
+        for i in range(phi.shape[1]):  # Loop over basis functions
+            
+            l_local = np.sum(f_values * phi[:, i] * Q.weights) * detJ  # Local integral contribution
+
+            l[nodes[i]] += l_local 
+
+    #obtain the boundary nodes
+
+    bound_nodes = boundary_nodes(fs)
+
+    #Employ the homogeneous Dirichlet conditions
+    l[bound_nodes] = 0
+    A[bound_nodes] = 0
+    A[bound_nodes, bound_nodes] = 1
+
+    return A, l
 
 
 def boundary_nodes(fs):

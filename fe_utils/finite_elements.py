@@ -36,7 +36,7 @@ def lagrange_points(cell, degree, obtain_entity_points=False):
                     end_idx = len(points)
                     entity_nodes[1][i] = list(range(start_idx, end_idx))
                 #interior entities
-        if degree >= 1:  # Interior points are only relevant for degree > 1
+        if degree >= 1:  # Interior points are only relevant for degree >= 1
             interior_indices = []
             for i in range(1, degree):
                 for j in range(1, degree - i):
@@ -48,7 +48,7 @@ def lagrange_points(cell, degree, obtain_entity_points=False):
                     interior_indices.append(len(points) - 1)
             entity_nodes[2] = {0: interior_indices}
     points = np.array(points)
-    print(entity_nodes)
+    
     if obtain_entity_points:
         return points, entity_nodes
     else:
@@ -209,7 +209,7 @@ class FiniteElement(object):
         else:
             result = np.einsum("ijk, jl -> ilk", vand, self.basis_coefs)
 
-        return result
+        return np.array(result)
 
     def interpolate(self, fn):
         """Interpolate fn onto this finite element by evaluating it

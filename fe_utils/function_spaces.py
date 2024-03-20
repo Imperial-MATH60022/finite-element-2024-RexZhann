@@ -200,6 +200,8 @@ class Function(object):
             
             # Tabulate the basis functions at each quadrature point
             basis_at_quad_points = self.function_space.element.tabulate(points)
+
+            #Obtain teh M(c, i)
             nodes = self.function_space.cell_nodes[c, :]
             # Evaluate the function at each quadrature point using its coefficients (values)
             f_values_at_quad_points = np.dot(basis_at_quad_points, self.values[nodes])  # Adjust as necessary
