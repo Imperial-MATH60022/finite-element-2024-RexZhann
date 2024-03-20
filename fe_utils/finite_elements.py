@@ -36,7 +36,7 @@ def lagrange_points(cell, degree, obtain_entity_points=False):
                     end_idx = len(points)
                     entity_nodes[1][i] = list(range(start_idx, end_idx))
                 #interior entities
-        if degree > 1:  # Interior points are only relevant for degree > 1
+        if degree >= 1:  # Interior points are only relevant for degree > 1
             interior_indices = []
             for i in range(1, degree):
                 for j in range(1, degree - i):
@@ -168,8 +168,11 @@ class FiniteElement(object):
         if entity_nodes:
             #: ``nodes_per_entity[d]`` is the number of entities
             #: associated with an entity of dimension d.
+            self.entity_nodes = entity_nodes
             self.nodes_per_entity = np.array([len(entity_nodes[d][0])
                                               for d in range(cell.dim+1)])
+        else:
+            self.entity_nodes = {}
 
         # Replace this exception with some code which sets
         # self.basis_coefs
@@ -244,7 +247,7 @@ class LagrangeElement(FiniteElement):
         The implementation of this class is left as an :ref:`exercise
         <ex-lagrange-element>`.
         """
-        nodes, self.entity_nodes = lagrange_points(cell, degree, obtain_entity_points=True)
+        nodes, entity_nodes = lagrange_points(cell, degree, obtain_entity_points=True)
         
 
 
@@ -252,4 +255,4 @@ class LagrangeElement(FiniteElement):
         # have obtained nodes, the following line will call the
         # __init__ method on the FiniteElement class to set up the
         # basis coefficients.
-        super(LagrangeElement, self).__init__(cell, degree, nodes, self.entity_nodes)
+        super(LagrangeElement, self).__init__(cell, degree, nodes, entity_nodes)

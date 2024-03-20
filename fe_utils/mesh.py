@@ -112,7 +112,22 @@ class Mesh(object):
         :result: The Jacobian for cell ``c``.
         """
 
-        raise NotImplementedError
+        vertex_indices = self.cell_vertices[c]
+
+        vertices = self.vertex_coords[vertex_indices]
+
+        if self.dim == 1:
+
+            J = np.array([[vertices[1, 0] - vertices[0, 0]]])
+
+        elif self.dim == 2:
+
+            J = np.array([[vertices[1, 0] - vertices[0, 0], vertices[2, 0] - vertices[0, 0]],
+                          
+                        [vertices[1, 1] - vertices[0, 1], vertices[2, 1] - vertices[0, 1]]])
+
+        return J
+        
 
 
 class UnitIntervalMesh(Mesh):

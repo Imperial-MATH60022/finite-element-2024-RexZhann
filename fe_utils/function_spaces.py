@@ -3,7 +3,7 @@ from . import ReferenceTriangle, ReferenceInterval
 from .finite_elements import LagrangeElement, lagrange_points
 from matplotlib import pyplot as plt
 from matplotlib.tri import Triangulation
-
+from.quadrature import gauss_quadrature
 
 class FunctionSpace(object):
 
@@ -11,7 +11,7 @@ class FunctionSpace(object):
         self.mesh = mesh
         self.element = element
         cell = element.cell
-        self.nodes_per_entity = np.array([len(self.element.entity_nodes.get(d, [0])[0]) for d in range(self.mesh.dim+1)])
+        self.nodes_per_entity = np.array([len(self.element.entity_nodes.get(d, [0])[0]) if self.element.entity_nodes.get(d, [0])[0] != None else 0 for d in range(self.mesh.dim+1)])
 
         # Calculate the total number of nodes in the function space
         self.node_count = sum(self.nodes_per_entity * np.array([mesh.entity_counts[d] for d in range(mesh.dim + 1)]))
@@ -26,9 +26,9 @@ class FunctionSpace(object):
                 for epsilon in range(len(element.entity_nodes[delta])):  # Loop over entities of dimension delta
 
                     if delta < mesh.dim:
-                        print(f'mesh : {mesh.adjacency(mesh.dim, delta)}')
-                        print(f'c : {c}')
-                        print(f'ep : {epsilon}')
+                        # print(f'mesh : {mesh.adjacency(mesh.dim, delta)}')
+                        # print(f'c : {c}')
+                        # print(f'ep : {epsilon}')
                         i = mesh.adjacency(mesh.dim, delta)[c, epsilon]
                     else:
                         i = c
@@ -39,8 +39,8 @@ class FunctionSpace(object):
                     for offset in range(N_delta):
                         indices.append(G + offset)
             
-            print(f'cell_nodes : {self.cell_nodes}')
-            print(f'indices : {indices}')
+            # print(f'cell_nodes : {self.cell_nodes}')
+            # print(f'indices : {indices}')
             self.cell_nodes[c] = indices
 
     def global_node_number(self, delta, i, mesh, element):
@@ -184,5 +184,30 @@ class Function(object):
         """Integrate this :class:`Function` over the domain.
 
         :result: The integral (a scalar)."""
+        
+        quadrature = gauss_quadrature(self.function_space.element.cell, self.function_space.element.degree + 1)
+        points = quadrature.points
+        weights = quadrature.weights
 
-        raise NotImplementedError
+        total_integral = 0
+
+        for c in range(len(self.function_space.mesh.cell_vertices)):
+
+            # Construct the Jacobian for this cell and its determinant
+            J = self.function_space.mesh.jacobian(c)
+
+            detJ = np.absolute(np.linalg.det(J))
+            
+            # Tabulate the basis functions at each quadrature point
+            basis_at_quad_points = self.function_space.element.tabulate(points)
+            nodes = self.function_space.cell_nodes[c, :]
+            # Evaluate the function at each quadrature point using its coefficients (values)
+            f_values_at_quad_points = np.dot(basis_at_quad_points, self.values[nodes])  # Adjust as necessary
+            
+            # Compute the contribution to the integral from this cell
+            cell_integral = np.einsum('q, q -> ', f_values_at_quad_points, weights) * detJ
+            
+            # Add the cell's contribution to the total integral
+            total_integral += cell_integral
+        
+        return total_integral
