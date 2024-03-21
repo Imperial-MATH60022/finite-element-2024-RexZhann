@@ -116,22 +116,6 @@ class Mesh(object):
         :result: The Jacobian for cell ``c``.
         """
 
-        '''vertex_indices = self.cell_vertices[c]
-
-        vertices = self.vertex_coords[vertex_indices]
-
-        if self.dim == 1:
-
-            J = np.array([[vertices[1, 0] - vertices[0, 0]]])
-
-        elif self.dim == 2:
-
-            J = np.array([[vertices[1, 0] - vertices[0, 0], vertices[2, 0] - vertices[0, 0]],
-                          
-                    [vertices[1, 1] - vertices[0, 1], vertices[2, 1] - vertices[0, 1]]])
-
-        return J'''
-
         ver_idx = self.cell_vertices[c, :]
 
         coords = np.transpose(self.vertex_coords[ver_idx, :])

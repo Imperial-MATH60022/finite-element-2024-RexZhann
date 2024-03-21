@@ -8,9 +8,12 @@ from.quadrature import gauss_quadrature
 class FunctionSpace(object):
 
     def __init__(self, mesh, element):
+        '''
+        an object storing the function space defined over a mesh with a given finite element.
+        '''
+
         self.mesh = mesh
         self.element = element
-        cell = element.cell
         self.nodes_per_entity = np.array([len(self.element.entity_nodes.get(d, [0])[0]) if self.element.entity_nodes.get(d, [0])[0] != None else 0 for d in range(self.mesh.dim+1)])
 
         # Calculate the total number of nodes in the function space
@@ -22,7 +25,7 @@ class FunctionSpace(object):
         for c, cell in enumerate(mesh.cell_vertices):
             indices = []
             for delta in range(mesh.dim + 1):  # Loop over entity dimensions
-                entity_count = mesh.entity_counts[delta]
+                
                 for epsilon in range(len(element.entity_nodes[delta])):  # Loop over entities of dimension delta
 
                     if delta < mesh.dim:
@@ -199,15 +202,15 @@ class Function(object):
             detJ = np.absolute(np.linalg.det(J))
             
             # Tabulate the basis functions at each quadrature point
-            basis_at_quad_points = self.function_space.element.tabulate(points)
+            phi = self.function_space.element.tabulate(points)
 
             #Obtain teh M(c, i)
             nodes = self.function_space.cell_nodes[c, :]
             # Evaluate the function at each quadrature point using its coefficients (values)
-            f_values_at_quad_points = np.dot(basis_at_quad_points, self.values[nodes])  # Adjust as necessary
+            f_values = np.dot(phi, self.values[nodes])  # Adjust as necessary
             
             # Compute the contribution to the integral from this cell
-            cell_integral = np.einsum('q, q -> ', f_values_at_quad_points, weights) * detJ
+            cell_integral = np.einsum('q, q -> ', f_values, weights) * detJ
             
             # Add the cell's contribution to the total integral
             total_integral += cell_integral

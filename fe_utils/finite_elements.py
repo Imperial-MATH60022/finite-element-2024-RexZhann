@@ -11,7 +11,7 @@ def lagrange_points(cell, degree, obtain_entity_points=False):
     entity_nodes = {dim: {} for dim in range(cell.dim + 1)}  # Initialize the entity_nodes dictionary
     
     if cell.dim == 1:
-        vertices = np.array(cell.vertices)
+        '''vertices = np.array(cell.vertices)
         points = np.linspace(vertices[0, 0], vertices[1, 0], degree + 1)
         points = points[:, np.newaxis]  # Ensure correct shape (N, 1) for 1D points
         points = list(points)
@@ -20,7 +20,21 @@ def lagrange_points(cell, degree, obtain_entity_points=False):
         points = np.array(points)
         if obtain_entity_points:
             entity_nodes[0] = {0: [0], 1: [1]}  # Vertex entities
-            entity_nodes[1] = {0: list(range(2, degree + 1))}  # Edge entities
+            entity_nodes[1] = {0: list(range(2, degree + 1))}  # Edge entities'''
+        for d in cell.topology:
+            for i, vertices in cell.topology[d].items():
+                if d == 0:  # Vertex entities
+                    points.append(cell.vertices[i])
+                    entity_nodes[0][i] = [len(points) - 1]
+                elif d == 1:  # Edge entities
+                    v0, v1 = vertices
+                    edge_points = [(1 - t / degree) * cell.vertices[v0] + (t / degree) * cell.vertices[v1] for t in range(1, degree)]
+                    start_idx = len(points)
+                    points.extend(edge_points)
+                    end_idx = len(points)
+                    entity_nodes[1][i] = list(range(start_idx, end_idx))
+                #interior entities
+        
 
     elif cell.dim == 2:
         for d in cell.topology:
