@@ -25,11 +25,11 @@ Implement  integration in finite element spaces;
 ### Assembling and Solving Problems
 Assemble the right-hand side and left-hand side matrices;\
 Solve the Poisson problem;\
-Solve the Helmholtz problem.\
+Solve the Helmholtz problem.
 
 Link to the repository: https://github.com/Imperial-MATH60022/finite-element-2024-RexZhann.git\
 
 All implementations done are stored in the fe_utils folder, where the two problems solved in the last part are stored in the fe_utils/solvers which can be run directly after installing the package.
-\
+
 
 A quick guide for installing the package: https://finite-element.github.io/implementation.html#obtaining-the-skeleton-code
