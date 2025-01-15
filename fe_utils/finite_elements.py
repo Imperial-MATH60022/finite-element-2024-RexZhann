@@ -1,23 +1,72 @@
 import numpy as np
 from .reference_elements import ReferenceInterval, ReferenceTriangle
+
+
 np.seterr(invalid='ignore', divide='ignore')
 
 
-def lagrange_points(cell, degree):
-    """Construct the locations of the equispaced Lagrange nodes on cell.
+def lagrange_points(cell, degree, obtain_entity_points=False):
 
-    :param cell: the :class:`~.reference_elements.ReferenceCell`
-    :param degree: the degree of polynomials for which to construct nodes.
+    points = []  # Store the generated Lagrange points here
+    entity_nodes = {dim: {} for dim in range(cell.dim + 1)}  # Initialize the entity_nodes dictionary
+    
+    if cell.dim == 1:
+        '''vertices = np.array(cell.vertices)
+        points = np.linspace(vertices[0, 0], vertices[1, 0], degree + 1)
+        points = points[:, np.newaxis]  # Ensure correct shape (N, 1) for 1D points
+        points = list(points)
+        vertex2 = points.pop(-1)
+        points.insert(1, vertex2)
+        points = np.array(points)
+        if obtain_entity_points:
+            entity_nodes[0] = {0: [0], 1: [1]}  # Vertex entities
+            entity_nodes[1] = {0: list(range(2, degree + 1))}  # Edge entities'''
+        for d in cell.topology:
+            for i, vertices in cell.topology[d].items():
+                if d == 0:  # Vertex entities
+                    points.append(cell.vertices[i])
+                    entity_nodes[0][i] = [len(points) - 1]
+                elif d == 1:  # Edge entities
+                    v0, v1 = vertices
+                    edge_points = [(1 - t / degree) * cell.vertices[v0] + (t / degree) * cell.vertices[v1] for t in range(1, degree)]
+                    start_idx = len(points)
+                    points.extend(edge_points)
+                    end_idx = len(points)
+                    entity_nodes[1][i] = list(range(start_idx, end_idx))
+                #interior entities
+        
 
-    :returns: a rank 2 :class:`~numpy.array` whose rows are the
-        coordinates of the nodes.
-
-    The implementation of this function is left as an :ref:`exercise
-    <ex-lagrange-points>`.
-
-    """
-
-    raise NotImplementedError
+    elif cell.dim == 2:
+        for d in cell.topology:
+            for i, vertices in cell.topology[d].items():
+                if d == 0:  # Vertex entities
+                    points.append(cell.vertices[i])
+                    entity_nodes[0][i] = [len(points) - 1]
+                elif d == 1:  # Edge entities
+                    v0, v1 = vertices
+                    edge_points = [(1 - t / degree) * cell.vertices[v0] + (t / degree) * cell.vertices[v1] for t in range(1, degree)]
+                    start_idx = len(points)
+                    points.extend(edge_points)
+                    end_idx = len(points)
+                    entity_nodes[1][i] = list(range(start_idx, end_idx))
+                #interior entities
+        if degree >= 1:  # Interior points are only relevant for degree >= 1
+            interior_indices = []
+            for i in range(1, degree):
+                for j in range(1, degree - i):
+                    lambda1 = i / degree
+                    lambda2 = j / degree
+                    lambda3 = 1 - lambda1 - lambda2
+                    interior_point = lambda1 * cell.vertices[0] + lambda2 * cell.vertices[1] + lambda3 * cell.vertices[2]
+                    points.append(interior_point)
+                    interior_indices.append(len(points) - 1)
+            entity_nodes[2] = {0: interior_indices}
+    points = np.array(points)
+    
+    if obtain_entity_points:
+        return points, entity_nodes
+    else:
+        return points
 
 
 def vandermonde_matrix(cell, degree, points, grad=False):
@@ -35,7 +84,67 @@ def vandermonde_matrix(cell, degree, points, grad=False):
     <ex-vandermonde>`.
     """
 
-    raise NotImplementedError
+    if not grad:
+
+        if cell.dim == 1:  # when dimension is 1
+
+            size = degree + 1
+            vandermonde = np.zeros((len(points), size))
+            points = [x[0] for x in points]
+            for i, point in enumerate(points):
+                vandermonde[i, 0] = np.array([0])
+                for j in range(0, degree + 1):
+                    vandermonde[i, j] = point ** j
+                pass
+
+        if cell.dim == 2:
+            size = (degree + 2) * (degree + 1) // 2
+            vandermonde = np.zeros((len(points), size))
+
+            for i, point in enumerate(points):
+                count_deg, count_pos = 0, 0
+                while count_deg <= degree:
+                    for j in range(count_deg + 1):
+                        if count_pos < size:
+                            vandermonde[i, count_pos] = point[1] ** j * point[0] ** (count_deg - j)
+                            count_pos += 1
+                            if j == count_deg:
+                                count_deg += 1
+                        pass
+                    
+
+    else:  # cases where we take the gradient
+
+        # 1-dimensional case
+        if cell.dim == 1:
+            size = degree + 1
+            vandermonde = np.zeros((len(points), size, 1))  # build up the shape of the vandermonde matrix
+            for i, point in enumerate(points):
+                for i, point in enumerate(points):
+                    vandermonde[i, 0] = np.array([0])  # fill in the constant terms
+                    for j in range(1, degree + 1):
+                        vandermonde[i, j, 0] = np.array([(j * point ** (j-1))]) # fill in the rest
+                    pass
+                
+        # 2-dimensional case
+        if cell.dim == 2:
+            size = (degree + 2) * (degree + 1) // 2
+            vandermonde = np.zeros((len(points), size, 2))  # build up the shape of the vandermonde matrix
+            for i, point in enumerate(points):
+                count_deg = 0  # set up two pointers, one for the current column position, and the other for the current degree.
+                count_pos = 0
+                while count_deg <= degree:
+                    for j in range(count_deg + 1):
+                        if count_pos < size:
+                            vandermonde[i, count_pos, 1], vandermonde[i, count_pos, 0] = np.array([j * np.real(np.power(point[1], (j - 1), dtype=complex)) * 
+                                                                                                   point[0] ** (count_deg - j)]), np.array([(count_deg - j) * 
+                                                                                                   point[1] ** j * np.real(np.power(point[0], (count_deg - j - 1), dtype=complex))])
+                            count_pos += 1
+                            if j == count_deg:
+                                count_deg += 1
+                        pass
+
+    return np.nan_to_num(vandermonde)
 
 
 class FiniteElement(object):
@@ -67,18 +176,21 @@ class FiniteElement(object):
         self.nodes = nodes
         #: A dictionary of dictionaries such that ``entity_nodes[d][i]``
         #: is the list of nodes associated with entity `(d, i)`.
-        self.entity_nodes = entity_nodes
+
+        self.basis_coefs = np.linalg.inv(vandermonde_matrix(cell, degree, nodes))
 
         if entity_nodes:
             #: ``nodes_per_entity[d]`` is the number of entities
             #: associated with an entity of dimension d.
+            self.entity_nodes = entity_nodes
             self.nodes_per_entity = np.array([len(entity_nodes[d][0])
                                               for d in range(cell.dim+1)])
+        else:
+            self.entity_nodes = {}
 
         # Replace this exception with some code which sets
         # self.basis_coefs
         # to an array of polynomial coefficients defining the basis functions.
-        raise NotImplementedError
 
         #: The number of nodes in this element.
         self.node_count = nodes.shape[0]
@@ -104,7 +216,14 @@ class FiniteElement(object):
 
         """
 
-        raise NotImplementedError
+        vand = vandermonde_matrix(self.cell, self.degree, points, grad=grad)
+        if not grad:
+            result = vand @ self.basis_coefs
+
+        else:
+            result = np.einsum("ijk, jl -> ilk", vand, self.basis_coefs)
+
+        return np.array(result)
 
     def interpolate(self, fn):
         """Interpolate fn onto this finite element by evaluating it
@@ -121,7 +240,7 @@ class FiniteElement(object):
 
         """
 
-        raise NotImplementedError
+        return [fn(node) for node in self.nodes]
 
     def __repr__(self):
         return "%s(%s, %s)" % (self.__class__.__name__,
@@ -142,10 +261,12 @@ class LagrangeElement(FiniteElement):
         The implementation of this class is left as an :ref:`exercise
         <ex-lagrange-element>`.
         """
+        nodes, entity_nodes = lagrange_points(cell, degree, obtain_entity_points=True)
+        
 
-        raise NotImplementedError
+
         # Use lagrange_points to obtain the set of nodes.  Once you
         # have obtained nodes, the following line will call the
         # __init__ method on the FiniteElement class to set up the
         # basis coefficients.
-        super(LagrangeElement, self).__init__(cell, degree, nodes)
+        super(LagrangeElement, self).__init__(cell, degree, nodes, entity_nodes)
